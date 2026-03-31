@@ -1,122 +1,141 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>ChatGPT UI - Gemini</title>
+  <meta charset="UTF-8">
+  <title>AI Chat Bot</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
 
-<style>
-body {
-    margin: 0;
-    font-family: system-ui;
-    background: #343541;
-    color: white;
-    display: flex;
-    height: 100vh;
-}
-.sidebar {
-    width: 250px;
-    background: #202123;
-    padding: 10px;
-}
-.main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-.chat {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-}
-.msg {
-    margin: 10px 0;
-    padding: 10px;
-    border-radius: 8px;
-    max-width: 700px;
-}
-.user { background: #444654; }
-.bot { background: #444654; }
-.input-area {
-    padding: 10px;
-    border-top: 1px solid #555;
-}
-input {
-    width: 80%;
-    padding: 10px;
-}
-button {
-    padding: 10px;
-}
-</style>
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .msg {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 10px;
+      max-width: 70%;
+    }
+
+    .user {
+      background: #2563eb;
+      margin-left: auto;
+    }
+
+    .bot {
+      background: #1e293b;
+    }
+
+    #inputArea {
+      display: flex;
+      padding: 10px;
+      background: #020617;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+    }
+
+    button {
+      margin-left: 10px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #22c55e;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
 </head>
-
 <body>
 
-<div class="sidebar">Gemini AI</div>
+<div id="chat"></div>
 
-<div class="main">
-    <div class="chat" id="chat"></div>
-
-    <div class="input-area">
-        <input id="input" placeholder="Mesaj yaz..." />
-        <button onclick="send()">Gönder</button>
-    </div>
+<div id="inputArea">
+  <input type="text" id="message" placeholder="Mesaj yaz...">
+  <button onclick="sendMessage()">Gönder</button>
 </div>
 
 <script>
-const API_KEY = "BURAYA_YENI_API_KEY";
+const API_KEY = "BURAYA_API_KEY"; // Gemini API key
+const chatDiv = document.getElementById("chat");
 
-async function send() {
-    const input = document.getElementById("input");
-    const text = input.value.trim();
-    if (!text) return;
+let history = [];
 
-    add(text, "user");
-    input.value = "";
-
-    add("Yazıyor...", "bot");
-
-    try {
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{ text: text }]
-                    }]
-                })
-            }
-        );
-
-        const data = await res.json();
-        console.log(data);
-
-        const reply =
-            data.candidates?.[0]?.content?.parts?.[0]?.text ||
-            "Cevap alınamadı (API hata verdi)";
-
-        document.querySelector(".bot:last-child").remove();
-        add(reply, "bot");
-
-    } catch (err) {
-        document.querySelector(".bot:last-child").remove();
-        add("HATA: API çalışmadı", "bot");
-        console.error(err);
-    }
+function addMessage(text, sender) {
+  const div = document.createElement("div");
+  div.className = "msg " + sender;
+  div.innerText = text;
+  chatDiv.appendChild(div);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-function add(text, cls) {
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.innerText = text;
-    document.getElementById("chat").appendChild(div);
-}
+async function sendMessage() {
+  const input = document.getElementById("message");
+  const text = input.value.trim();
+  if (!text) return;
 
-document.getElementById("input").addEventListener("keypress", e => {
-    if (e.key === "Enter") send();
-});
+  addMessage(text, "user");
+  input.value = "";
+
+  history.push({
+    role: "user",
+    parts: [{ text }]
+  });
+
+  const typing = document.createElement("div");
+  typing.className = "msg bot";
+  typing.innerText = "Yazıyor...";
+  chatDiv.appendChild(typing);
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: history
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    typing.remove();
+
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Cevap alınamadı.";
+
+    addMessage(reply, "bot");
+
+    history.push({
+      role: "model",
+      parts: [{ text: reply }]
+    });
+
+  } catch (err) {
+    typing.innerText = "Hata oluştu!";
+    console.error(err);
+  }
+}
 </script>
 
 </body>
