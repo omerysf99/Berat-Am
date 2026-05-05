@@ -198,6 +198,8 @@
     </div>
 
     <script>
+        // API KEY boş bırakılmıştır. Bu ortamda API anahtarı sistem tarafından otomatik sağlanır.
+        // Eğer dışarıda kullanacaksanız buraya kendi Google AI Studio anahtarınızı girmelisiniz.
         const apiKey = ""; 
         const chatForm = document.getElementById('chatForm');
         const userInput = document.getElementById('userInput');
@@ -212,7 +214,7 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[88%] ${isUser ? 'ml-auto' : 'mr-auto'} animate-in fade-in slide-in-from-bottom-2 duration-300`;
             
-            // Markdown and formatting
+            // Markdown ve biçimlendirme
             const formattedText = text
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/`(.*?)`/g, '<code>$1</code>')
@@ -223,7 +225,7 @@
                     ${formattedText}
                 </div>
                 <div class="flex items-center gap-2 mt-2 px-2">
-                    ${isUser ? `<span class="text-[10px] text-blue-400 font-bold uppercase">Sen</span>` : `<span class="text-[10px] text-purple-400 font-bold uppercase">Berat AI</span>`}
+                    ${isUser ? `<span class="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Sen</span>` : `<span class="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Berat AI</span>`}
                     <span class="text-[10px] text-slate-500 font-medium">${time}</span>
                 </div>
             `;
@@ -233,6 +235,7 @@
         }
 
         async function fetchAIResponse(userPrompt) {
+            // Sadece bu önizleme ortamında çalışan endpoint
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
             const payload = {
@@ -242,6 +245,7 @@
                 }
             };
 
+            // Retry logic with exponential backoff
             for (let i = 0; i < 5; i++) {
                 try {
                     const response = await fetch(url, {
@@ -250,10 +254,16 @@
                         body: JSON.stringify(payload)
                     });
 
-                    if (!response.ok) throw new Error('API Error');
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        console.error("API Error Detail:", errData);
+                        throw new Error('API Hatası: ' + (errData.error?.message || 'Bilinmeyen hata'));
+                    }
+
                     const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Şu an bir yanıt oluşturamıyorum, lütfen tekrar deneyin.";
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Üzgünüm, şu an bir yanıt oluşturamıyorum.";
                 } catch (error) {
+                    console.warn(`Retry ${i + 1} due to:`, error);
                     if (i === 4) throw error;
                     await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
@@ -279,7 +289,8 @@
                     addMessage(aiResponse, false);
                 } catch (error) {
                     typingIndicator.classList.add('hidden');
-                    addMessage("Sistemlerimizde geçici bir yoğunluk var. Lütfen birkaç saniye sonra tekrar deneyin.", false);
+                    console.error("Chat Error:", error);
+                    addMessage(`**Hata:** Yanıt alınamadı. Lütfen internet bağlantınızı veya API anahtarınızı kontrol edin. Teknik detay: ${error.message}`, false);
                 } finally {
                     userInput.disabled = false;
                     sendBtn.disabled = false;
